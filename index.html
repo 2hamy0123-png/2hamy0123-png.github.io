@@ -397,7 +397,8 @@ label.ph.add:focus-within{outline:3px solid var(--brand)}
 .mode-note{background:#fff6dc;border-bottom:1px solid #f1dc9c;color:#6b4f00;font-size:13px;font-weight:700;text-align:center;padding:6px 16px}
 .danger{border:1px solid #f5c7c2;background:#fff8f7}
 .localnote{background:#e9f7ef;border-bottom:1px solid #bfe7cf;color:#0f5a32;font-size:13px;font-weight:700;text-align:center;padding:6px 16px}
-.fb{position:fixed;z-index:34;bottom:calc(92px + env(safe-area-inset-bottom,0px));inset-inline-start:max(12px,env(safe-area-inset-right,0px));background:var(--wa);color:#05361a;border-radius:999px;padding:10px 16px;font-weight:800;text-decoration:none;box-shadow:0 10px 26px #0004}
+.fb{position:fixed;z-index:34;bottom:calc(16px + env(safe-area-inset-bottom,0px));inset-inline-start:max(12px,env(safe-area-inset-right,0px));background:var(--wa);color:#05361a;border-radius:999px;padding:7px 13px;font-size:13.5px;font-weight:800;text-decoration:none;box-shadow:0 8px 20px #0004}
+body:has(.cartbar) .fb{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 /* ===== Egyptian hara buildings ===== */
 .shop{width:196px}
 .bld{position:relative;filter:drop-shadow(0 18px 26px #0006)}
@@ -525,7 +526,7 @@ const TERMS=["الحارة منصة لعرض المحلات. البيع بيتم
   "تقدر تطلب قفل محلك ومسح بياناتك في أي وقت."];
 const SHIP={local:"منطقته بس",gov:"المحافظة كلها",egypt:"كل مصر"};
 const DAYS=["نفس اليوم","يوم واحد","٢-٣ أيام","٣-٥ أيام","أسبوع"];
-const FEEDBACK_WA=""; // رقم واتساب لاستقبال الآراء بصيغة دولية، مثلاً "201012345678". سيبه فاضي لإخفاء الزرار.
+const FEEDBACK_WA="201026052869"; // رقم واتساب لاستقبال الآراء بصيغة دولية، مثلاً "201012345678". سيبه فاضي لإخفاء الزرار.
 const ARTIFACT_URL="https://claude.ai/artifact/D8WeNsDfRsPLjqhQv74SvD";
 const shopHash=id=>"shop-"+(/^[A-Za-z0-9-]+$/.test(id)?id:"x"+[...new TextEncoder().encode(id)].map(b=>b.toString(16).padStart(2,"0")).join(""));
 function hashShop(h){let k=h.slice(5);if(/^x(?:[0-9a-f]{2})+$/.test(k)){try{k=new TextDecoder().decode(new Uint8Array(k.slice(1).match(/../g).map(x=>parseInt(x,16))))}catch{}}return k}
