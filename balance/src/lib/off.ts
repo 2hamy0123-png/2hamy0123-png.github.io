@@ -6,6 +6,8 @@ export interface Product {
   brand?: string;
   per100: { kcal: number; protein: number; carbs: number; fat: number };
   servingG?: number;
+  /** Shown beside the amount, e.g. "1 plate". Only for built-in foods. */
+  servingLabel?: string;
   /** True when the database has the product but no energy value for it. */
   incomplete: boolean;
 }
@@ -54,4 +56,27 @@ export async function lookupBarcode(code: string): Promise<Product | null> {
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Lookup failed (${res.status})`);
   return parseProduct(code, await res.json());
+}
+
+/** Turns a name-search response into complete products only (those with an energy value). */
+export function parseSearch(body: unknown, limit = 10): Product[] {
+  const list = (body as { products?: unknown } | null)?.products;
+  if (!Array.isArray(list)) return [];
+  const out: Product[] = [];
+  for (const p of list) {
+    const code = typeof (p as { code?: unknown })?.code === 'string' ? (p as { code: string }).code : '';
+    const product = parseProduct(code, { status: 1, product: p });
+    if (product && !product.incomplete && product.name !== 'Unnamed product') out.push(product);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/** Searches packaged products by name. Throws when offline. */
+export async function searchProducts(query: string): Promise<Product[]> {
+  const q = encodeURIComponent(query.trim());
+  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${q}&search_simple=1&action=process&json=1&page_size=20&fields=code,${FIELDS}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Search failed (${res.status})`);
+  return parseSearch(await res.json());
 }

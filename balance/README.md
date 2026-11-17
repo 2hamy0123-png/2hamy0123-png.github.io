@@ -2,8 +2,10 @@
 
 An Android app that shows one number a day: what you ate minus the share of what you burned.
 
-- **Food:** scan a product barcode (looked up in the open Open Food Facts database) or add a meal by hand.
-- **Activity:** track a run, walk or ride with GPS, or log any other workout manually with its effort.
+- **Food:** scan a product barcode (looked up in the open Open Food Facts database), search by name in English or Arabic (about 40 common Egyptian and Arabic foods are built in, plus an online search of packaged products), repeat a recent food, copy yesterday's meal, or add a meal by hand.
+- **Activity:** track a run, walk or ride with GPS (it keeps recording with the screen locked), or log any other workout manually with its effort.
+- **Reminders:** an optional lunch and day-end notification, skipped on days that meal is already logged.
+- **Backup:** save all data to one file and restore it on a new phone.
 - **Progress:** 7-day weight average, days in range and weekly active minutes.
 - **Team:** private teams of 3 to 5 people are planned for the next version.
 
@@ -47,5 +49,7 @@ cd android && ./gradlew assembleDebug
 
 ## Known limits
 
-- GPS tracking works while the app is open on screen. The app keeps the screen on during an activity; tracking with the screen locked needs a native background service, which is not built yet.
-- Barcode coverage is weaker for some local products, so manual entry is always one tap away.
+- Values for the built-in common foods are typical for home cooking, so they are approximate.
+- Barcode coverage is weaker for some local products, so search and manual entry are always one tap away.
+- Tracking with the screen locked uses an Android foreground service with a visible notification. Some phone makers stop background apps aggressively; if tracking stops, set the app's battery use to "Unrestricted".
+- Reminders and background tracking only work in the Android app, not in a browser.

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatKcal, scalePer100 } from '../lib/calc';
-import { isBarcode, lookupBarcode, type Product } from '../lib/off';
+import { COMMON_FOODS, searchFoods, type CommonFood } from '../lib/foods';
+import { isBarcode, lookupBarcode, searchProducts, type Product } from '../lib/off';
 import { startScanner, type Scanner } from '../lib/scanner';
 import { MEALS, mealForHour, type DaySummary, type FoodEntry, type Meal } from '../lib/store';
 import { Icon, Meter, Segmented, Sheet, TextField, parseNum } from '../ui';
@@ -9,6 +10,10 @@ export type NewFood = Omit<FoodEntry, 'id' | 'date'>;
 
 interface Props {
   day: DaySummary;
+  /** Distinct foods eaten before, newest first. */
+  recent: FoodEntry[];
+  /** Everything logged yesterday. */
+  yesterday: FoodEntry[];
   openScan: boolean;
   onOpenScanHandled: () => void;
   onAdd: (f: NewFood) => void;
@@ -17,9 +22,17 @@ interface Props {
 
 const MEAL_OPTIONS = MEALS.map((m) => ({ value: m, label: m }));
 
-export function Food({ day, openScan, onOpenScanHandled, onAdd, onRemove }: Props) {
-  const [sheet, setSheet] = useState<null | 'scan' | 'manual'>(null);
-  const [prefillCode, setPrefillCode] = useState<string | undefined>();
+function fromCommon(food: CommonFood): Product {
+  return { code: '', name: food.name, per100: food.per100, servingG: food.servingG, servingLabel: food.servingLabel, incomplete: false };
+}
+
+function toNew(f: FoodEntry, meal: Meal = f.meal): NewFood {
+  return { meal, name: f.name, amount: f.amount, kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat, barcode: f.barcode };
+}
+
+export function Food({ day, recent, yesterday, openScan, onOpenScanHandled, onAdd, onRemove }: Props) {
+  const [sheet, setSheet] = useState<null | 'scan' | 'manual' | 'search'>(null);
+  const [prefill, setPrefill] = useState<Partial<ManualInit> | undefined>();
 
   useEffect(() => {
     if (openScan) {
@@ -29,6 +42,10 @@ export function Food({ day, openScan, onOpenScanHandled, onAdd, onRemove }: Prop
   }, [openScan, onOpenScanHandled]);
 
   const close = useCallback(() => setSheet(null), []);
+  const openManual = (init?: Partial<ManualInit>) => {
+    setPrefill(init);
+    setSheet('manual');
+  };
   const groups = MEALS.map((meal) => ({ meal, items: day.foods.filter((f) => f.meal === meal) })).filter((g) => g.items.length > 0);
 
   return (
@@ -48,19 +65,15 @@ export function Food({ day, openScan, onOpenScanHandled, onAdd, onRemove }: Prop
           <Icon name="barcode" size={22} />
           <span>Scan barcode</span>
         </button>
-        <button
-          type="button"
-          className="btn btn-outline grow"
-          style={{ minHeight: 56 }}
-          onClick={() => {
-            setPrefillCode(undefined);
-            setSheet('manual');
-          }}
-        >
-          <Icon name="plus" size={18} />
-          <span>Add manually</span>
+        <button type="button" className="btn btn-outline grow" style={{ minHeight: 56 }} onClick={() => setSheet('search')}>
+          <Icon name="search" size={18} />
+          <span>Search food</span>
         </button>
       </div>
+      <button type="button" className="btn btn-outline" onClick={() => openManual()}>
+        <Icon name="plus" size={18} />
+        <span>Add manually</span>
+      </button>
 
       <section className="card stack" aria-label="Macros" style={{ gap: 12 }}>
         <div className="grid-3" style={{ gap: 16 }}>
@@ -72,7 +85,7 @@ export function Food({ day, openScan, onOpenScanHandled, onAdd, onRemove }: Prop
       </section>
 
       <section className="list" aria-label="Meals">
-        {groups.length === 0 ? <p className="empty">No food logged today. Scan a barcode or add a meal.</p> : null}
+        {groups.length === 0 ? <p className="empty">No food logged today. Scan a barcode or search for a meal.</p> : null}
         {groups.map(({ meal, items }) => (
           <div className="group" key={meal}>
             <div className="group-head">
@@ -104,15 +117,28 @@ export function Food({ day, openScan, onOpenScanHandled, onAdd, onRemove }: Prop
             onAdd(f);
             close();
           }}
-          onManual={(code) => {
-            setPrefillCode(code);
-            setSheet('manual');
+          onManual={(code) => openManual({ barcode: code })}
+        />
+      ) : null}
+      {sheet === 'search' ? (
+        <SearchSheet
+          recent={recent}
+          yesterday={yesterday}
+          onClose={close}
+          onAdd={(f) => {
+            onAdd(f);
+            close();
           }}
+          onAddMany={(list) => {
+            list.forEach(onAdd);
+            close();
+          }}
+          onManual={(init) => openManual(init)}
         />
       ) : null}
       {sheet === 'manual' ? (
         <ManualSheet
-          barcode={prefillCode}
+          init={prefill}
           onClose={close}
           onAdd={(f) => {
             onAdd(f);
@@ -275,6 +301,7 @@ function ProductForm({ product, onAdd, onManual }: { product: Product; onAdd: (f
         <span className="small muted">
           {product.brand ? `${product.brand}, ` : ''}
           {formatKcal(product.per100.kcal)} kcal per 100 g
+          {product.servingLabel && product.servingG ? `. ${product.servingLabel} is about ${product.servingG} g.` : ''}
         </span>
       </div>
       <TextField label="Amount, grams" value={grams} onChange={setGrams} numeric big />
@@ -288,11 +315,7 @@ function ProductForm({ product, onAdd, onManual }: { product: Product; onAdd: (f
         type="button"
         className="btn btn-eaten"
         disabled={!portion}
-        onClick={() =>
-          portion &&
-          g !== null &&
-          onAdd({ meal, name: product.name, amount: `${g} g`, barcode: product.code, ...portion })
-        }
+        onClick={() => portion && g !== null && onAdd({ meal, name: product.name, amount: `${g} g`, barcode: product.code || undefined, ...portion })}
       >
         Add to {meal.toLowerCase()}
       </button>
@@ -300,13 +323,192 @@ function ProductForm({ product, onAdd, onManual }: { product: Product; onAdd: (f
   );
 }
 
-function ManualSheet({ barcode, onClose, onAdd }: { barcode?: string; onClose: () => void; onAdd: (f: NewFood) => void }) {
-  const [name, setName] = useState('');
-  const [amount, setAmount] = useState('');
-  const [kcal, setKcal] = useState('');
-  const [protein, setProtein] = useState('');
-  const [carbs, setCarbs] = useState('');
-  const [fat, setFat] = useState('');
+type Online = { k: 'idle' } | { k: 'loading' } | { k: 'error' } | { k: 'done'; items: Product[] };
+
+function SearchSheet({
+  recent,
+  yesterday,
+  onClose,
+  onAdd,
+  onAddMany,
+  onManual,
+}: {
+  recent: FoodEntry[];
+  yesterday: FoodEntry[];
+  onClose: () => void;
+  onAdd: (f: NewFood) => void;
+  onAddMany: (f: NewFood[]) => void;
+  onManual: (init: Partial<ManualInit>) => void;
+}) {
+  const [q, setQ] = useState('');
+  const [picked, setPicked] = useState<Product | null>(null);
+  const [online, setOnline] = useState<Online>({ k: 'idle' });
+  const term = q.trim();
+
+  const local = useMemo(() => searchFoods(term), [term]);
+  const recents = useMemo(() => {
+    if (!term) return recent.slice(0, 8);
+    const needle = term.toLowerCase();
+    return recent.filter((f) => f.name.toLowerCase().includes(needle)).slice(0, 4);
+  }, [recent, term]);
+
+  const copyable = MEALS.map((meal) => ({ meal, items: yesterday.filter((f) => f.meal === meal) })).filter((g) => g.items.length > 0);
+
+  const searchOnline = async () => {
+    if (term.length < 2) return;
+    setOnline({ k: 'loading' });
+    try {
+      setOnline({ k: 'done', items: await searchProducts(term) });
+    } catch {
+      setOnline({ k: 'error' });
+    }
+  };
+
+  if (picked) {
+    return (
+      <Sheet title={picked.name} onClose={onClose}>
+        <ProductForm product={picked} onAdd={onAdd} onManual={() => onManual({ name: picked.name })} />
+        <button type="button" className="btn btn-outline" onClick={() => setPicked(null)}>
+          Back to results
+        </button>
+      </Sheet>
+    );
+  }
+
+  return (
+    <Sheet title="Search food" onClose={onClose}>
+      <form
+        className="stack"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void searchOnline();
+        }}
+      >
+        <TextField label="Food name, English or Arabic" value={q} onChange={(v) => { setQ(v); setOnline({ k: 'idle' }); }} placeholder="koshari, كشري, oat milk" />
+      </form>
+
+      {term === '' && copyable.length > 0 ? (
+        <section className="stack" aria-label="Copy from yesterday">
+          <h3 className="caps">Copy from yesterday</h3>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            {copyable.map(({ meal, items }) => (
+              <button
+                key={meal}
+                type="button"
+                className="chip-btn"
+                onClick={() => onAddMany(items.map((f) => toNew(f)))}
+              >
+                {meal}, {formatKcal(items.reduce((s, i) => s + i.kcal, 0))} kcal
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {recents.length > 0 ? (
+        <section className="stack" aria-label="Eaten before">
+          <h3 className="caps">{term ? 'Eaten before' : 'Recent'}</h3>
+          <div className="list">
+            {recents.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className="pick"
+                onClick={() => onManual({ name: f.name, amount: f.amount, kcal: String(f.kcal), protein: String(f.protein), carbs: String(f.carbs), fat: String(f.fat), barcode: f.barcode })}
+              >
+                <span className="item-main">
+                  <span className="item-title">{f.name}</span>
+                  <span className="small muted">{f.amount}</span>
+                </span>
+                <span className="item-val eaten">{formatKcal(f.kcal)}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {term !== '' ? (
+        <section className="stack" aria-label="Common foods">
+          <h3 className="caps">Common foods</h3>
+          {local.length === 0 ? <p className="small muted">No common food matches. Try the online search below.</p> : null}
+          {local.length > 0 ? (
+            <div className="list">
+              {local.map((food) => (
+                <button key={food.name} type="button" className="pick" onClick={() => setPicked(fromCommon(food))}>
+                  <span className="item-main">
+                    <span className="item-title">{food.name}</span>
+                    <span className="small muted">
+                      {food.servingLabel}, about {Math.round((food.per100.kcal * food.servingG) / 100)} kcal
+                    </span>
+                  </span>
+                  <Icon name="plus" size={18} />
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <p className="tiny muted">Values for common foods are typical for home cooking, so treat them as approximate.</p>
+        </section>
+      ) : (
+        <p className="small muted">
+          Type a name to search {COMMON_FOODS.length} common foods. For packaged products, search online or scan the barcode.
+        </p>
+      )}
+
+      {term.length >= 2 ? (
+        <section className="stack" aria-label="Packaged products">
+          <button type="button" className="btn btn-outline" onClick={() => void searchOnline()} disabled={online.k === 'loading'}>
+            <Icon name="search" size={18} />
+            <span>{online.k === 'loading' ? 'Searching…' : 'Search packaged products online'}</span>
+          </button>
+          {online.k === 'error' ? (
+            <p className="notice" role="alert">
+              Could not reach the food database. Check your connection and try again.
+            </p>
+          ) : null}
+          {online.k === 'done' && online.items.length === 0 ? <p className="small muted">No packaged products found for "{term}".</p> : null}
+          {online.k === 'done' && online.items.length > 0 ? (
+            <div className="list">
+              {online.items.map((p) => (
+                <button key={`${p.code}-${p.name}`} type="button" className="pick" onClick={() => setPicked(p)}>
+                  <span className="item-main">
+                    <span className="item-title">{p.name}</span>
+                    <span className="small muted">
+                      {p.brand ? `${p.brand}, ` : ''}
+                      {formatKcal(p.per100.kcal)} kcal per 100 g
+                    </span>
+                  </span>
+                  <Icon name="plus" size={18} />
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      <button type="button" className="btn btn-outline" onClick={() => onManual({ name: term })}>
+        Can't find it? Add manually
+      </button>
+    </Sheet>
+  );
+}
+
+interface ManualInit {
+  name: string;
+  amount: string;
+  kcal: string;
+  protein: string;
+  carbs: string;
+  fat: string;
+  barcode: string;
+}
+
+function ManualSheet({ init, onClose, onAdd }: { init?: Partial<ManualInit>; onClose: () => void; onAdd: (f: NewFood) => void }) {
+  const [name, setName] = useState(init?.name ?? '');
+  const [amount, setAmount] = useState(init?.amount ?? '');
+  const [kcal, setKcal] = useState(init?.kcal ?? '');
+  const [protein, setProtein] = useState(init?.protein ?? '');
+  const [carbs, setCarbs] = useState(init?.carbs ?? '');
+  const [fat, setFat] = useState(init?.fat ?? '');
   const [meal, setMeal] = useState<Meal>(() => mealForHour(new Date().getHours()));
 
   const k = parseNum(kcal);
@@ -317,7 +519,7 @@ function ManualSheet({ barcode, onClose, onAdd }: { barcode?: string; onClose: (
   const valid = name.trim() !== '' && k !== null && p !== null && c !== null && f !== null;
 
   return (
-    <Sheet title="Add food" onClose={onClose}>
+    <Sheet title={init?.kcal ? 'Add again' : 'Add food'} onClose={onClose}>
       <TextField label="Name" value={name} onChange={setName} placeholder="Lentil soup" />
       <div className="grid-2">
         <TextField label="Amount" value={amount} onChange={setAmount} placeholder="1 bowl" />
@@ -343,7 +545,7 @@ function ManualSheet({ barcode, onClose, onAdd }: { barcode?: string; onClose: (
             protein: p,
             carbs: c,
             fat: f,
-            barcode,
+            barcode: init?.barcode,
           })
         }
       >

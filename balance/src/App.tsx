@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { dateKey, type Profile } from './lib/calc';
-import { daySummary, loadState, newId, saveState, type AppState } from './lib/store';
+import { addDays, dateKey, type Profile } from './lib/calc';
+import { syncReminders } from './lib/native';
+import { DEFAULT_REMINDERS, daySummary, loadState, newId, saveState, type AppState, type FoodEntry, type Reminders } from './lib/store';
 import { Activity, type NewActivity } from './screens/Activity';
 import { Food, type NewFood } from './screens/Food';
 import { Progress } from './screens/Progress';
+import { Settings } from './screens/Settings';
 import { Setup } from './screens/Setup';
 import { Team } from './screens/Team';
 import { Today } from './screens/Today';
@@ -33,6 +35,16 @@ export function App() {
   useEffect(() => {
     if (state) void saveState(state);
   }, [state]);
+
+  // Keep scheduled reminders in step with the settings and with what is logged today.
+  const reminders = state?.reminders ?? DEFAULT_REMINDERS;
+  const lunchLogged = !!state?.foods.some((f) => f.date === today && f.meal === 'Lunch');
+  const dinnerLogged = !!state?.foods.some((f) => f.date === today && f.meal === 'Dinner');
+  const hasProfile = !!state?.profile;
+  useEffect(() => {
+    if (!hasProfile) return;
+    void syncReminders({ on: reminders.on, midday: reminders.midday, evening: reminders.evening, skipMidday: lunchLogged, skipEvening: dinnerLogged });
+  }, [hasProfile, reminders.on, reminders.midday, reminders.evening, lunchLogged, dinnerLogged, today]);
 
   // Roll over to the new day when the app is left open past midnight.
   useEffect(() => {
@@ -71,10 +83,37 @@ export function App() {
   if (!profile || editingProfile) {
     return (
       <div className="app">
-        <Setup initial={profile} onSave={saveProfile} onCancel={profile ? () => setEditingProfile(false) : undefined} />
+        <Setup
+          initial={profile}
+          onSave={saveProfile}
+          onCancel={profile ? () => setEditingProfile(false) : undefined}
+          extra={
+            <Settings
+              state={state}
+              restoreOnly={!profile}
+              onReminders={(r: Reminders) => update((s) => ({ ...s, reminders: r }))}
+              onRestore={(restored) => {
+                setState(restored);
+                setEditingProfile(false);
+                setTab('today');
+              }}
+            />
+          }
+        />
       </div>
     );
   }
+
+  // Foods eaten before (newest first, one per name) and yesterday's log, for quick adding.
+  const recent: FoodEntry[] = [];
+  const seen = new Set<string>();
+  for (let i = state.foods.length - 1; i >= 0 && recent.length < 12; i--) {
+    const key = state.foods[i].name.trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    recent.push(state.foods[i]);
+  }
+  const yesterday = state.foods.filter((f) => f.date === addDays(today, -1));
 
   const day = daySummary(state, profile, today);
   const addFood = (f: NewFood) => update((s) => ({ ...s, foods: [...s.foods, { ...f, id: newId(), date: today }] }));
@@ -101,7 +140,7 @@ export function App() {
         />
       ) : null}
       {tab === 'food' ? (
-        <Food day={day} openScan={intent === 'scan'} onOpenScanHandled={clearIntent} onAdd={addFood} onRemove={removeFood} />
+        <Food day={day} recent={recent} yesterday={yesterday} openScan={intent === 'scan'} onOpenScanHandled={clearIntent} onAdd={addFood} onRemove={removeFood} />
       ) : null}
       {tab === 'activity' ? (
         <Activity

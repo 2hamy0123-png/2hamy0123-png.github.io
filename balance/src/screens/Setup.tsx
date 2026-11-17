@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { bmi, canLose, dailyTarget, isAdult, macroTargets, type Goal, type Profile, type Sex } from '../lib/calc';
 import { formatKcal } from '../lib/calc';
 import { Segmented, TextField, parseNum } from '../ui';
@@ -7,9 +7,11 @@ interface Props {
   initial: Profile | null;
   onSave: (p: Profile) => void;
   onCancel?: () => void;
+  /** Extra sections shown above the buttons, such as reminders and backup. */
+  extra?: ReactNode;
 }
 
-export function Setup({ initial, onSave, onCancel }: Props) {
+export function Setup({ initial, onSave, onCancel, extra }: Props) {
   const [sex, setSex] = useState<Sex>(initial?.sex ?? 'female');
   const [age, setAge] = useState(initial ? String(initial.age) : '');
   const [height, setHeight] = useState(initial ? String(initial.heightCm) : '');
@@ -132,6 +134,8 @@ export function Setup({ initial, onSave, onCancel }: Props) {
           </p>
         </section>
       ) : null}
+
+      {extra}
 
       <div className="row">
         {onCancel ? (

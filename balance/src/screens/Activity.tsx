@@ -11,6 +11,7 @@ import {
   type Effort,
   type LatLon,
 } from '../lib/calc';
+import { startTracking, type GpsStatus } from '../lib/native';
 import { partOfDay, type ActivityEntry, type DaySummary } from '../lib/store';
 import { Icon, Segmented, Sheet, TextField, parseNum } from '../ui';
 
@@ -191,7 +192,7 @@ function thin(track: [number, number][], max = 400): [number, number][] {
   return out;
 }
 
-type GpsState = 'waiting' | 'ok' | 'weak' | 'off';
+type GpsState = 'waiting' | GpsStatus;
 
 const GPS_TEXT: Record<GpsState, string> = {
   waiting: 'Waiting for GPS…',
@@ -215,31 +216,30 @@ function TrackerSheet({ weightKg, onClose, onSave }: { weightKg: number; onClose
 
   const watching = phase === 'run' || phase === 'paused';
 
+  // On the phone this keeps running with the screen locked (foreground service).
   useEffect(() => {
     if (!watching) return;
-    if (!('geolocation' in navigator)) {
-      setGps('off');
-      return;
-    }
-    const id = navigator.geolocation.watchPosition(
-      (pos) => {
-        const { latitude, longitude, accuracy } = pos.coords;
-        setGps(accuracy <= 30 ? 'ok' : 'weak');
-        const st = s.current;
-        if (!st.running) return;
-        const next = { lat: latitude, lon: longitude };
-        if (!acceptFix(st.last, next, accuracy)) return;
-        if (st.last) {
-          st.distance += haversineM(st.last, next);
-          setDistance(st.distance);
-        }
-        st.last = next;
-        st.track.push([latitude, longitude]);
-      },
-      (err) => setGps(err.code === err.PERMISSION_DENIED ? 'off' : 'weak'),
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 },
-    );
-    return () => navigator.geolocation.clearWatch(id);
+    let cancelled = false;
+    let stop: (() => void) | undefined;
+    void startTracking((fix) => {
+      const st = s.current;
+      if (!st.running) return;
+      const next = { lat: fix.lat, lon: fix.lon };
+      if (!acceptFix(st.last, next, fix.accuracy)) return;
+      if (st.last) {
+        st.distance += haversineM(st.last, next);
+        setDistance(st.distance);
+      }
+      st.last = next;
+      st.track.push([fix.lat, fix.lon]);
+    }, setGps).then((fn) => {
+      if (cancelled) fn();
+      else stop = fn;
+    });
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
   }, [watching]);
 
   // Keep the screen on while tracking, where the device allows it.

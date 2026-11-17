@@ -33,6 +33,25 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M20 6v12" />
     </>
   ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16 16l4.5 4.5" />
+    </>
+  ),
+  download: (
+    <>
+      <path d="M12 4v11" />
+      <path d="M7.500 10.500L12 15l4.500-4.500" />
+      <path d="M5 19h14" />
+    </>
+  ),
+  bell: (
+    <>
+      <path d="M6 16V11a6 6 0 0 1 12 0v5l1.500 2h-15z" />
+      <path d="M10 21h4" />
+    </>
+  ),
   play: <path d="M7 5l12 7-12 7z" />,
   pause: (
     <>

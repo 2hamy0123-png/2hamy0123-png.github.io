@@ -43,12 +43,23 @@ export interface ActivityEntry {
   track?: [number, number][];
 }
 
+export interface Reminders {
+  on: boolean;
+  /** "HH:MM" for the lunch reminder. */
+  midday: string;
+  /** "HH:MM" for the dinner and day-end reminder. */
+  evening: string;
+}
+
+export const DEFAULT_REMINDERS: Reminders = { on: false, midday: '13:30', evening: '20:30' };
+
 export interface AppState {
   v: 1;
   profile: Profile | null;
   foods: FoodEntry[];
   activities: ActivityEntry[];
   weights: WeightEntry[];
+  reminders?: Reminders;
 }
 
 export const EMPTY_STATE: AppState = { v: 1, profile: null, foods: [], activities: [], weights: [] };
