@@ -53,6 +53,13 @@ export interface Reminders {
 
 export const DEFAULT_REMINDERS: Reminders = { on: false, midday: '13:30', evening: '20:30' };
 
+/** The team this phone belongs to. The key never leaves the phone except inside an invite. */
+export interface TeamInfo {
+  teamId: string;
+  key: string;
+  myName: string;
+}
+
 export interface AppState {
   v: 1;
   profile: Profile | null;
@@ -60,6 +67,7 @@ export interface AppState {
   activities: ActivityEntry[];
   weights: WeightEntry[];
   reminders?: Reminders;
+  team?: TeamInfo;
 }
 
 export const EMPTY_STATE: AppState = { v: 1, profile: null, foods: [], activities: [], weights: [] };

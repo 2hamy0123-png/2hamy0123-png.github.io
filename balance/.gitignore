@@ -1,3 +1,7 @@
 node_modules/
 dist/
+dist-emulator/
 e2e-out/
+firestore-debug.log
+firebase-debug.log
+ui-debug.log

@@ -33,6 +33,12 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M20 6v12" />
     </>
   ),
+  send: (
+    <>
+      <path d="M5 12h14" />
+      <path d="M13 6l6 6-6 6" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="6.5" />

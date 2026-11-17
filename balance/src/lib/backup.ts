@@ -1,6 +1,6 @@
 // Export and import of everything stored on the phone, as one JSON file.
 import type { ActivityType, Effort, Goal, Profile, Sex } from './calc';
-import { MEALS, type ActivityEntry, type AppState, type FoodEntry, type Reminders } from './store';
+import { MEALS, type ActivityEntry, type AppState, type FoodEntry, type Reminders, type TeamInfo } from './store';
 
 export class BackupError extends Error {}
 
@@ -107,6 +107,14 @@ function reminders(x: unknown): Reminders {
   return { on: o.on === true, midday: time(o.midday, 'The lunch reminder time'), evening: time(o.evening, 'The evening reminder time') };
 }
 
+function team(x: unknown): TeamInfo {
+  const o = obj(x, 'The team');
+  const teamId = str(o.teamId, 'The team id', 12);
+  const key = str(o.key, 'The team key', 22);
+  if (!/^[a-z2-9]{12}$/.test(teamId) || !/^[A-Za-z0-9_-]{22}$/.test(key)) fail('The team invite');
+  return { teamId, key, myName: str(o.myName, 'Your team name', 20) };
+}
+
 export function backupFileName(day: string): string {
   return `balance-backup-${day}.json`;
 }
@@ -138,6 +146,7 @@ export function parseBackup(text: string): AppState {
     }),
   };
   if (d.reminders !== undefined) state.reminders = reminders(d.reminders);
+  if (d.team !== undefined) state.team = team(d.team);
   return state;
 }
 

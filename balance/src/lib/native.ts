@@ -126,3 +126,28 @@ export async function syncReminders(plan: ReminderPlanInput, now = new Date()): 
     // Reminders are a convenience; a failure here must never break logging.
   }
 }
+
+export type ShareResult = 'shared' | 'copied' | 'cancelled' | 'failed';
+
+/** Shares text with the phone's share sheet, or copies it where sharing is not available. */
+export async function shareText(text: string, title: string): Promise<ShareResult> {
+  try {
+    if (isNative()) {
+      const { Share } = await import('@capacitor/share');
+      await Share.share({ title, text, dialogTitle: title });
+      return 'shared';
+    }
+    if (typeof navigator.share === 'function') {
+      await navigator.share({ title, text });
+      return 'shared';
+    }
+  } catch (e) {
+    if ((e instanceof Error && e.name === 'AbortError') || (e instanceof Error && /cancel/i.test(e.message))) return 'cancelled';
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    return 'copied';
+  } catch {
+    return 'failed';
+  }
+}

@@ -51,6 +51,14 @@ describe('backup', () => {
     expect(parseBackup(JSON.stringify(extra)).foods[0]).not.toHaveProperty('evil');
   });
 
+  it('keeps the team and rejects a damaged team invite', () => {
+    const withTeam: AppState = { ...sample, team: { teamId: 'abcdefghjkmn', key: 'A'.repeat(22), myName: 'Sara' } };
+    expect(parseBackup(serializeBackup(withTeam)).team).toEqual(withTeam.team);
+    const bad = JSON.parse(serializeBackup(withTeam));
+    bad.data.team.key = 'short';
+    expect(() => parseBackup(JSON.stringify(bad))).toThrow('team invite');
+  });
+
   it('describes what a file holds', () => {
     expect(describeBackup(sample)).toBe('1 foods, 1 activities and 1 weights over 1 days');
   });

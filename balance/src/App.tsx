@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { addDays, dateKey, type Profile } from './lib/calc';
 import { syncReminders } from './lib/native';
-import { DEFAULT_REMINDERS, daySummary, loadState, newId, saveState, type AppState, type FoodEntry, type Reminders } from './lib/store';
+import { DEFAULT_REMINDERS, daySummary, loadState, newId, saveState, type AppState, type FoodEntry, type Reminders, type TeamInfo } from './lib/store';
 import { Activity, type NewActivity } from './screens/Activity';
 import { Food, type NewFood } from './screens/Food';
 import { Progress } from './screens/Progress';
 import { Settings } from './screens/Settings';
 import { Setup } from './screens/Setup';
-import { Team } from './screens/Team';
+import { TeamSync } from './TeamSync';
 import { Today } from './screens/Today';
 import { Icon } from './ui';
+
+const Team = lazy(() => import('./screens/Team').then((m) => ({ default: m.Team })));
 
 type Tab = 'today' | 'food' | 'activity' | 'team' | 'progress';
 
@@ -120,6 +122,11 @@ export function App() {
   const removeFood = (id: string) => update((s) => ({ ...s, foods: s.foods.filter((f) => f.id !== id) }));
   const addActivity = (a: NewActivity) => update((s) => ({ ...s, activities: [...s.activities, { ...a, id: newId(), date: today }] }));
   const removeActivity = (id: string) => update((s) => ({ ...s, activities: s.activities.filter((a) => a.id !== id) }));
+  const setTeam = (t: TeamInfo | null) =>
+    update((s) => {
+      const { team: _old, ...rest } = s;
+      return t ? { ...rest, team: t } : rest;
+    });
   const logWeight = (kg: number) => update((s) => withWeight({ ...s, profile: s.profile ? { ...s.profile, weightKg: kg } : s.profile }, kg));
 
   return (
@@ -152,7 +159,12 @@ export function App() {
           onRemove={removeActivity}
         />
       ) : null}
-      {tab === 'team' ? <Team /> : null}
+      {tab === 'team' ? (
+        <Suspense fallback={<main className="screen" aria-busy="true" />}>
+          <Team team={state.team} today={today} onTeam={setTeam} />
+        </Suspense>
+      ) : null}
+      <TeamSync state={state} today={today} />
       {tab === 'progress' ? <Progress state={state} profile={profile} today={today} onLogWeight={logWeight} /> : null}
 
       <nav className="nav" aria-label="Main">

@@ -7,9 +7,9 @@ An Android app that shows one number a day: what you ate minus the share of what
 - **Reminders:** an optional lunch and day-end notification, skipped on days that meal is already logged.
 - **Backup:** save all data to one file and restore it on a new phone.
 - **Progress:** 7-day weight average, days in range and weekly active minutes.
-- **Team:** private teams of 3 to 5 people are planned for the next version.
+- **Team:** a private team of up to 5 shares a weekly goal in active minutes, keeps a streak together, can take breaks without breaking it, nudges (once a day per person) and swaps ideas.
 
-All data stays on the phone. There are no accounts and no servers.
+Food, activity and weight stay on the phone with no account. Only the team feature uses a server (Firebase, free plan), and it stores nothing readable: every card, message and name is encrypted on the phone with a key that exists only in the invite. A team sees whether you logged, whether your day is in range and your active minutes, never your calories or weight.
 
 ## Rules the numbers follow
 
@@ -46,6 +46,23 @@ npm run build
 npx cap sync android
 cd android && ./gradlew assembleDebug
 ```
+
+## Teams and Firebase
+
+The team feature uses the Firebase project `balance-team` (anonymous sign-in plus Firestore). The public client settings are in `src/lib/firebase.ts`; they identify the project and are not secrets. Access is controlled by `firestore.rules`:
+
+- only members can read a team, a team has at most 5 members,
+- joining needs a proof that is a document id containing the hash of the invite key,
+- people write only their own cards and messages; nudges are create-only, which limits them to one per person per day.
+
+To change the rules, edit `firestore.rules`, then paste it into Firebase console, Firestore Database, Rules, and press Publish.
+
+```sh
+npm run test:rules   # runs the rules and team service tests on the local Firestore emulator
+npm run build:emulator   # a build that talks to local emulators, used for two-phone tests
+```
+
+If a phone is lost, its place is held until a teammate removes it (Team, trash icon next to the name), after which the person can rejoin with the invite.
 
 ## Known limits
 
