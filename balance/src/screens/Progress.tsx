@@ -135,12 +135,10 @@ function WeightChart({ weights, today }: { weights: WeightEntry[]; today: string
   const TOP = 14;
   const PLOT_H = 112;
   const values = [...daily.map((p) => p.kg), ...avg.map((p) => p.kg)];
-  let lo = Math.floor((Math.min(...values) - 0.2) * 2) / 2;
-  let hi = Math.ceil((Math.max(...values) + 0.2) * 2) / 2;
-  if (hi - lo < 1) {
-    lo -= 0.5;
-    hi += 0.5;
-  }
+  // Whole-kilogram bounds, so the middle gridline is a clean x.0 or x.5 value.
+  const lo = Math.floor(Math.min(...values) - 0.2);
+  let hi = Math.ceil(Math.max(...values) + 0.2);
+  if (hi - lo < 1) hi = lo + 1;
   const x = (i: number) => X0 + (i * (X1 - X0)) / (days.length - 1);
   const y = (kg: number) => TOP + ((hi - kg) / (hi - lo)) * PLOT_H;
   const ticks = [hi, (hi + lo) / 2, lo];

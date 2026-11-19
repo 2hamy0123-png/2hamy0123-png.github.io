@@ -47,6 +47,16 @@ npx cap sync android
 cd android && ./gradlew assembleDebug
 ```
 
+## Publishing a public download
+
+The download page lives in `get-balance/` (a static page served by GitHub Pages) and the app file is served from GitHub Releases, so one permanent link always gives the newest version:
+
+`https://github.com/2hamy0123-png/2hamy0123-png.github.io/releases/latest/download/Balance.apk`
+
+One-time setup: create the app's permanent signing key and add it as four repository secrets (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) under Settings, Secrets and variables, Actions. Keep a private backup of the key: if it is lost, people who installed the app cannot update it and must uninstall first. With the secrets set, every build is signed with it, so each new APK installs over the previous one and keeps the user's data.
+
+To publish a version, push a tag such as `v0.1.0`. The **Balance release** workflow builds the signed APK, checks its signature and publishes a GitHub Release. It refuses to run without the signing secrets.
+
 ## Teams and Firebase
 
 The team feature uses the Firebase project `balance-team` (anonymous sign-in plus Firestore). The public client settings are in `src/lib/firebase.ts`; they identify the project and are not secrets. Access is controlled by `firestore.rules`:

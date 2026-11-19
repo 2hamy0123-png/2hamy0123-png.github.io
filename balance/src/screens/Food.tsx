@@ -61,11 +61,11 @@ export function Food({ day, recent, yesterday, openScan, onOpenScanHandled, onAd
       </header>
 
       <div className="row">
-        <button type="button" className="btn btn-eaten grow" style={{ minHeight: 56, fontSize: 16 }} onClick={() => setSheet('scan')}>
-          <Icon name="barcode" size={22} />
+        <button type="button" className="btn btn-eaten grow" style={{ minHeight: 56, fontSize: 15, padding: '0 10px', whiteSpace: 'nowrap' }} onClick={() => setSheet('scan')}>
+          <Icon name="barcode" size={20} />
           <span>Scan barcode</span>
         </button>
-        <button type="button" className="btn btn-outline grow" style={{ minHeight: 56 }} onClick={() => setSheet('search')}>
+        <button type="button" className="btn btn-outline grow" style={{ minHeight: 56, padding: '0 10px', whiteSpace: 'nowrap' }} onClick={() => setSheet('search')}>
           <Icon name="search" size={18} />
           <span>Search food</span>
         </button>

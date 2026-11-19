@@ -1,0 +1,4 @@
+# Never commit signing keys
+*.jks
+*.keystore
+balance-signing-secrets*
