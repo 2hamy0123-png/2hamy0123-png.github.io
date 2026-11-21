@@ -1,0 +1,77 @@
+name: Balance Android build
+
+# Builds an installable APK of the Balance app on GitHub's servers.
+# Download it from the run's "Artifacts" section.
+#
+# With the signing secrets set (see balance/README.md) the APK is signed with the
+# permanent release key, so each new build installs over the previous one.
+# Without them it falls back to a debug build, which Android treats as a
+# different app after every build.
+
+on:
+  push:
+    paths:
+      - 'balance/**'
+      - '.github/workflows/balance-android.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      APP_VERSION: 0.1.${{ github.run_number }}
+    defaults:
+      run:
+        working-directory: balance
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: balance/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Copy web app into the Android project
+        run: npx cap sync android
+
+      - name: Build APK
+        working-directory: balance/android
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          # The alias defaults to "balance" and the key password to the keystore password,
+          # so only ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD are required.
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || 'balance' }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            export KEYSTORE_FILE="$RUNNER_TEMP/release.jks"
+            ./gradlew assembleRelease --no-daemon
+            echo "APK_PATH=app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_ENV"
+          else
+            # Also compile the release variant (unsigned) so a broken release setup shows up here.
+            ./gradlew assembleDebug assembleRelease --no-daemon
+            echo "APK_PATH=app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: balance-apk
+          path: balance/android/${{ env.APK_PATH }}
+          if-no-files-found: error
