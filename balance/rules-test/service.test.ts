@@ -3,10 +3,15 @@ import { collection, getDocs } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { TeamInfo } from '../src/lib/store';
+import { addDays } from '../src/lib/calc';
 import {
+  HISTORY_DAYS,
+  LIVE_DAYS,
   TeamError,
   createTeam,
   deletePost,
+  fetchCards,
+  leaveTeam,
   joinTeam,
   publishCard,
   removeFromTeam,
@@ -173,6 +178,34 @@ describe('team service', () => {
     const snap = await until('u1', team, (s) => s.memberUids.length === 1);
     expect(snap.memberUids).toEqual(['u1']);
     await expect(until('u2', omar, () => false)).rejects.toMatchObject({ code: 'removed' });
+  });
+
+  it('keeps only the last week live and reads older days once', async () => {
+    const { team, join } = await startTeam();
+    await join('u2', 'Omar');
+    const old = addDays(TODAY, -20);
+    const recent = addDays(TODAY, -2);
+    await publishCard(as('u1'), 'u1', team, old, { logged: true, inRange: true, activeMin: 10 });
+    await publishCard(as('u1'), 'u1', team, recent, { logged: true, inRange: false, activeMin: 20 });
+    const live = await until('u1', team, (s) => !!s.cards[recent]?.u1);
+    expect(live.cards[old]).toBeUndefined();
+
+    const history = await fetchCards(as('u2'), team, addDays(TODAY, -HISTORY_DAYS - 1), addDays(TODAY, -LIVE_DAYS - 1));
+    expect(history[old]?.u1).toEqual({ logged: true, inRange: true, activeMin: 10 });
+    expect(history[recent]).toBeUndefined();
+    expect(await fetchCards(as('u2'), team, addDays(TODAY, -5), addDays(TODAY, -6))).toEqual({});
+    await expect(fetchCards(as('stranger'), team, addDays(TODAY, -HISTORY_DAYS), TODAY)).rejects.toBeInstanceOf(TeamError);
+  });
+
+  it('deletes your messages when you leave, and only yours', async () => {
+    const { team, join } = await startTeam();
+    const omar = await join('u2', 'Omar');
+    await sendPost(as('u2'), 'u2', omar, 'bye for now');
+    await sendPost(as('u1'), 'u1', team, 'stays here');
+    await until('u1', team, (s) => s.posts.length === 2);
+    await leaveTeam(as('u2'), 'u2', team.teamId);
+    const snap = await until('u1', team, (s) => s.memberUids.length === 1 && s.posts.length === 1);
+    expect(snap.posts[0].text).toBe('stays here');
   });
 
   it('keeps outsiders out of the data', async () => {

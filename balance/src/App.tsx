@@ -9,6 +9,7 @@ import { Settings } from './screens/Settings';
 import { Setup } from './screens/Setup';
 import { TeamSync } from './TeamSync';
 import { Today } from './screens/Today';
+import { Welcome } from './screens/Welcome';
 import { Icon } from './ui';
 
 const Team = lazy(() => import('./screens/Team').then((m) => ({ default: m.Team })));
@@ -27,6 +28,7 @@ export function App() {
   const [state, setState] = useState<AppState | null>(null);
   const [tab, setTab] = useState<Tab>('today');
   const [editingProfile, setEditingProfile] = useState(false);
+  const [welcomed, setWelcomed] = useState(false);
   const [intent, setIntent] = useState<null | 'scan' | 'start'>(null);
   const [today, setToday] = useState(() => dateKey(new Date()));
 
@@ -80,6 +82,14 @@ export function App() {
     });
     setEditingProfile(false);
   };
+
+  if (!state.profile && !welcomed) {
+    return (
+      <div className="app">
+        <Welcome onStart={() => setWelcomed(true)} />
+      </div>
+    );
+  }
 
   const profile = state.profile;
   if (!profile || editingProfile) {

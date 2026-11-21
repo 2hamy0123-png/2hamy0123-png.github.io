@@ -818,3 +818,80 @@ button {
 .wk-future {
   opacity: 0.6;
 }
+
+a.chip-btn {
+  text-decoration: none;
+  color: var(--ink);
+}
+
+/* ---- welcome ---- */
+
+.welcome {
+  min-height: 100dvh;
+  background: var(--ink);
+  color: #fff;
+  padding: calc(28px + env(safe-area-inset-top)) 24px calc(28px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.welcome-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.welcome-title {
+  font-family: var(--display);
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.welcome-lead {
+  color: var(--on-ink-muted);
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.welcome-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.welcome-list li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.welcome-icon {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--on-ink-eaten);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.welcome-fine {
+  color: var(--on-ink-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}

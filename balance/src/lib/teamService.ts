@@ -7,6 +7,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   limit,
   onSnapshot,
   orderBy,
@@ -189,11 +190,44 @@ export async function sendNudge(db: Firestore, uid: string, teamId: string, to: 
   }
 }
 
-export const CARD_WINDOW_DAYS = 90;
+/** Days of cards kept live (this week plus today). Older days come from fetchCards and a local cache. */
+export const LIVE_DAYS = 7;
+/** How far back the team history (and so the longest streak shown) reaches. */
+export const HISTORY_DAYS = 120;
+export const POST_LIMIT = 20;
 
 interface Sealed {
   iv: string;
   ct: string;
+}
+
+/**
+ * Reads the cards dated after `after` up to and including `through`, once.
+ * Used for days older than the live window, which no longer change.
+ */
+export async function fetchCards(db: Firestore, team: TeamInfo, after: string, through: string): Promise<TeamCards> {
+  if (after >= through) return {};
+  try {
+    const snap = await getDocs(query(collection(db, 'teams', team.teamId, 'days'), where('date', '>', after), where('date', '<=', through)));
+    const out: TeamCards = {};
+    for (const o of await openAll<DayCard>(team.key, snap.docs)) {
+      (out[String(o.data.date)] ??= {})[String(o.data.uid)] = o.value;
+    }
+    return out;
+  } catch (e) {
+    throw failed(e);
+  }
+}
+
+/** Leaves a team: deletes your own messages first, then removes you. */
+export async function leaveTeam(db: Firestore, uid: string, teamId: string): Promise<void> {
+  try {
+    const mine = await getDocs(query(collection(db, 'teams', teamId, 'posts'), where('uid', '==', uid)));
+    await Promise.all(mine.docs.map((d) => deleteDoc(d.ref)));
+  } catch (e) {
+    throw failed(e);
+  }
+  await removeFromTeam(db, teamId, uid);
 }
 
 interface Opened<T> {
@@ -280,7 +314,7 @@ export function subscribeTeam(
       fail,
     ),
     onSnapshot(
-      query(collection(db, ...base, 'days'), where('date', '>=', addDays(today, -CARD_WINDOW_DAYS))),
+      query(collection(db, ...base, 'days'), where('date', '>=', addDays(today, -LIVE_DAYS))),
       async (snap) => {
         const n = ++seq.days;
         const opened = await openAll<DayCard>(team.key, snap.docs);
@@ -297,7 +331,7 @@ export function subscribeTeam(
       fail,
     ),
     onSnapshot(
-      query(collection(db, ...base, 'posts'), orderBy('at', 'desc'), limit(50)),
+      query(collection(db, ...base, 'posts'), orderBy('at', 'desc'), limit(POST_LIMIT)),
       async (snap) => {
         const n = ++seq.posts;
         const opened = await openAll<{ text: string }>(team.key, snap.docs);

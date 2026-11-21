@@ -72,6 +72,8 @@ npm run test:rules   # runs the rules and team service tests on the local Firest
 npm run build:emulator   # a build that talks to local emulators, used for two-phone tests
 ```
 
+To stay within the free Firebase plan, the Team tab listens live only to the last week of cards. Older days are read once and kept on the phone (`src/lib/teamHistory.ts`), so opening the tab costs a few dozen reads instead of hundreds. Leaving a team deletes your own messages.
+
 If a phone is lost, its place is held until a teammate removes it (Team, trash icon next to the name), after which the person can rejoin with the invite.
 
 ## Known limits

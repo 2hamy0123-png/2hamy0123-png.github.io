@@ -2,6 +2,9 @@ import { useRef, useState } from 'react';
 import { MAX_BACKUP_BYTES, BackupError, backupFileName, describeBackup, parseBackup, serializeBackup } from '../lib/backup';
 import { dateKey } from '../lib/calc';
 import { isNative, requestReminderPermission, shareBackup } from '../lib/native';
+
+const PRIVACY_URL = 'https://2hamy0123-png.github.io/get-balance/privacy.html';
+const FEEDBACK_URL = 'https://github.com/2hamy0123-png/2hamy0123-png.github.io/issues';
 import { DEFAULT_REMINDERS, type AppState, type Reminders } from '../lib/store';
 import { Icon, Segmented } from '../ui';
 
@@ -144,6 +147,23 @@ export function Settings({ state, restoreOnly, onReminders, onRestore }: Props) 
           </p>
         ) : null}
       </section>
+
+      {!restoreOnly ? (
+        <section className="card stack" aria-label="About Balance" style={{ gap: 12 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600 }}>About</h2>
+          <p className="small muted">
+            Balance {__APP_VERSION__}. Calorie and burn figures are general estimates, not medical advice. If you have a health condition, talk to a doctor or dietitian.
+          </p>
+          <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+            <a className="chip-btn" href={PRIVACY_URL} target={native ? undefined : '_blank'} rel="noopener noreferrer">
+              Privacy policy
+            </a>
+            <a className="chip-btn" href={FEEDBACK_URL} target={native ? undefined : '_blank'} rel="noopener noreferrer">
+              Send feedback
+            </a>
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }

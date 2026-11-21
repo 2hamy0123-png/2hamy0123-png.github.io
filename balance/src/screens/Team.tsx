@@ -5,12 +5,13 @@ import { shareText } from '../lib/native';
 import type { TeamInfo } from '../lib/store';
 import { makeInvite } from '../lib/teamCrypto';
 import {
-  CARD_WINDOW_DAYS,
+  HISTORY_DAYS,
   MAX_POST,
   TeamError,
   createTeam,
   deletePost,
   joinTeam,
+  leaveTeam,
   removeFromTeam,
   sendNudge,
   sendPost,
@@ -18,7 +19,8 @@ import {
   writeProfile,
   type TeamSnapshot,
 } from '../lib/teamService';
-import { MAX_TEAM, MIN_TEAM, breakEnd, cleanName, dayState, onBreak, streak, weekStart, weeklyGoal, type DayCard, type Member } from '../lib/teamLogic';
+import { clearHistory, loadHistory } from '../lib/teamHistory';
+import { MAX_TEAM, MIN_TEAM, breakEnd, cleanName, dayState, onBreak, streak, weekStart, weeklyGoal, type DayCard, type Member, type TeamCards } from '../lib/teamLogic';
 import { Icon, Meter, Segmented, Sheet, TextField } from '../ui';
 
 interface Props {
@@ -185,6 +187,19 @@ function Home({ client, team, today, onTeam }: { client: Client; team: TeamInfo;
   const [message, setMessage] = useState('');
   const [nudged, setNudged] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [history, setHistory] = useState<TeamCards>({});
+
+  // Older days are read once and kept on the phone; only the last week is live.
+  useEffect(() => {
+    let alive = true;
+    loadHistory(client.db, team, today).then(
+      (h) => alive && setHistory(h),
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+  }, [client, team, today]);
 
   useEffect(() => {
     setLost(null);
@@ -231,7 +246,14 @@ function Home({ client, team, today, onTeam }: { client: Client; team: TeamInfo;
               >
                 Rejoin with the saved invite
               </button>
-              <button type="button" className="btn btn-outline" onClick={() => onTeam(null)}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => {
+                  void clearHistory(team.teamId);
+                  onTeam(null);
+                }}
+              >
                 Forget this team
               </button>
             </>
@@ -263,11 +285,12 @@ function Home({ client, team, today, onTeam }: { client: Client; team: TeamInfo;
     );
   }
 
+  const cards: TeamCards = { ...history, ...snap.cards };
   const me = snap.members.find((m) => m.uid === client.uid);
-  const todayCards = snap.cards[today] ?? {};
-  const goal = weeklyGoal(snap.cards, snap.members, today);
-  const run = streak(snap.cards, snap.members, today, CARD_WINDOW_DAYS);
-  const state = dayState(snap.cards, snap.members, today, today);
+  const todayCards = cards[today] ?? {};
+  const goal = weeklyGoal(cards, snap.members, today);
+  const run = streak(cards, snap.members, today, HISTORY_DAYS);
+  const state = dayState(cards, snap.members, today, today);
   const names = new Map(snap.members.map((m) => [m.uid, m.name]));
   const waitingNames = state.waitingFor.map((u) => names.get(u) ?? 'Someone');
   const places = MAX_TEAM - snap.memberUids.length;
@@ -277,7 +300,7 @@ function Home({ client, team, today, onTeam }: { client: Client; team: TeamInfo;
 
   const week = DAY_LETTERS.map((letter, i) => {
     const day = addDays(weekStart(today), i);
-    const kind = day > today ? 'future' : dayState(snap.cards, snap.members, day, today).state;
+    const kind = day > today ? 'future' : dayState(cards, snap.members, day, today).state;
     return { letter, day, kind };
   });
 
@@ -311,9 +334,10 @@ function Home({ client, team, today, onTeam }: { client: Client; team: TeamInfo;
     });
 
   const leave = () => {
-    if (!window.confirm('Leave this team? Your teammates keep their data and you can rejoin with the invite.')) return;
+    if (!window.confirm('Leave this team? Your messages in it will be deleted. You can rejoin later with the invite.')) return;
     void guard(async () => {
-      await removeFromTeam(client.db, team.teamId, client.uid);
+      await leaveTeam(client.db, client.uid, team.teamId);
+      await clearHistory(team.teamId);
       onTeam(null);
     });
   };
@@ -373,7 +397,7 @@ function Home({ client, team, today, onTeam }: { client: Client; team: TeamInfo;
             <path d="M12 3c1 3 4 5 4 9a4 4 0 0 1-8 0c0-1.5.5-2.5 1.5-3.5C10 10 11.5 7 12 3z" />
           </svg>
           <span data-testid="streak">
-            {run >= CARD_WINDOW_DAYS - 1 ? `${run}+` : run}-day team streak
+            {run >= HISTORY_DAYS - 1 ? `${run}+` : run}-day team streak
           </span>
         </h2>
         <div className="week" aria-hidden="true">
