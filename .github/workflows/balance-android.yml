@@ -54,14 +54,18 @@ jobs:
         env:
           KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          # The alias defaults to "balance" and the key password to the keystore password,
-          # so only ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD are required.
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || 'balance' }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           if [ -n "$KS_B64" ]; then
-            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
-            export KEYSTORE_FILE="$RUNNER_TEMP/release.jks"
+            # Use one password for the store and the key (they are the same in this PKCS12 keystore),
+            # and ignore stray spaces or line breaks picked up when the secret was pasted.
+            KEYSTORE_PASSWORD="$(printf '%s' "$KEYSTORE_PASSWORD" | tr -d '[:space:]')"
+            printf '%s' "$KS_B64" | tr -d '[:space:]' | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "Keystore fingerprint: $(sha256sum "$RUNNER_TEMP/release.jks" | cut -c1-12), password length: ${#KEYSTORE_PASSWORD}"
+            if ! keytool -list -keystore "$RUNNER_TEMP/release.jks" -storepass "$KEYSTORE_PASSWORD" > /dev/null 2>&1; then
+              echo "::error::ANDROID_KEYSTORE_PASSWORD does not open the keystore in ANDROID_KEYSTORE_BASE64. Paste both values again from the secrets file."
+              exit 1
+            fi
+            export KEYSTORE_FILE="$RUNNER_TEMP/release.jks" KEYSTORE_PASSWORD KEY_ALIAS=balance KEY_PASSWORD="$KEYSTORE_PASSWORD"
             ./gradlew assembleRelease --no-daemon
             echo "APK_PATH=app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_ENV"
           else
