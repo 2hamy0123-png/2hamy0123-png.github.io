@@ -7,8 +7,9 @@ android {
         applicationId "io.github.balance.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // CI sets these so every build has a higher version code and a readable name.
-        versionCode Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
+        // CI sets these. Releases use VERSION_CODE from the version (0.1.0 -> 10000), test builds the run
+        // number, so a release always installs over any test build made before it.
+        versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: System.getenv('GITHUB_RUN_NUMBER') ?: '1')
         versionName System.getenv('APP_VERSION') ?: '0.1.0'
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
