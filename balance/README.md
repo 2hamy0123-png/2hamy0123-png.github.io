@@ -53,7 +53,7 @@ The download page lives in `get-balance/` (a static page served by GitHub Pages)
 
 `https://github.com/2hamy0123-png/2hamy0123-png.github.io/releases/latest/download/Balance.apk`
 
-One-time setup: create the app's permanent signing key and add it as repository secrets: `ANDROID_KEYSTORE_BASE64` and `ANDROID_KEYSTORE_PASSWORD` are required; `ANDROID_KEY_ALIAS` (default `balance`) and `ANDROID_KEY_PASSWORD` (default: the keystore password) are optional under Settings, Secrets and variables, Actions. Keep a private backup of the key: if it is lost, people who installed the app cannot update it and must uninstall first. With the secrets set, every build is signed with it, so each new APK installs over the previous one and keeps the user's data.
+One-time setup: create the app's permanent signing key and add it as two repository secrets, `ANDROID_KEYSTORE_BASE64` and `ANDROID_KEYSTORE_PASSWORD` (the key alias is `balance` and the key password is the keystore password). The build checks that the password opens the keystore before building and prints the keystore's fingerprint and the password length, never the values under Settings, Secrets and variables, Actions. Keep a private backup of the key: if it is lost, people who installed the app cannot update it and must uninstall first. With the secrets set, every build is signed with it, so each new APK installs over the previous one and keeps the user's data.
 
 To publish a version, push a tag such as `v0.1.0`. The **Balance release** workflow builds the signed APK, checks its signature and publishes a GitHub Release. It refuses to run without the signing secrets.
 
