@@ -1,6 +1,8 @@
 name: Balance release
 
-# Publishes a public download. Run it by pushing a version tag such as v0.1.0.
+# Publishes a public download, in either of two ways:
+#   - Actions tab > Balance release > Run workflow, on main, with a version such as 0.1.0
+#   - pushing a version tag such as v0.1.0
 # The APK is attached to a GitHub Release as Balance.apk, so this permanent link always
 # serves the newest version:
 #   https://github.com/2hamy0123-png/2hamy0123-png.github.io/releases/latest/download/Balance.apk
@@ -12,6 +14,11 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, for example 0.1.0'
+        required: true
 
 permissions:
   contents: write
@@ -21,6 +28,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Work out the version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+              echo "::error::Run this workflow on the main branch."
+              exit 1
+            fi
+            VERSION="${INPUT_VERSION#v}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          if ! [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::The version must look like 1.2.3."
+            exit 1
+          fi
+          if [ "${BASH_REMATCH[2]}" -gt 99 ] || [ "${BASH_REMATCH[3]}" -gt 99 ]; then
+            echo "::error::Minor and patch numbers must be 99 or less."
+            exit 1
+          fi
+          CODE=$(( BASH_REMATCH[1] * 1000000 + BASH_REMATCH[2] * 10000 + BASH_REMATCH[3] * 100 ))
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TAG=v$VERSION" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$CODE" >> "$GITHUB_ENV"
+          echo "Publishing Balance $VERSION (version code $CODE)"
 
       - name: Require the signing key
         env:
@@ -46,7 +80,7 @@ jobs:
       - name: Test and build the web app
         working-directory: balance
         run: |
-          export APP_VERSION="${GITHUB_REF_NAME#v}"
+          export APP_VERSION="$VERSION"
           npm ci
           npm test
           npm run build
@@ -68,7 +102,7 @@ jobs:
             exit 1
           fi
           export KEYSTORE_FILE="$RUNNER_TEMP/release.jks" KEYSTORE_PASSWORD KEY_ALIAS=balance KEY_PASSWORD="$KEYSTORE_PASSWORD"
-          export APP_VERSION="${GITHUB_REF_NAME#v}"
+          export APP_VERSION="$VERSION"
           ./gradlew assembleRelease --no-daemon
           cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/Balance.apk"
 
@@ -83,7 +117,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           { cat balance/release-notes.md; echo; echo "**SHA-256:** \`$(cut -d' ' -f1 Balance.apk.sha256)\`"; } > notes.md
-          gh release create "$GITHUB_REF_NAME" Balance.apk Balance.apk.sha256 \
-            --title "Balance ${GITHUB_REF_NAME#v}" \
+          # Creates the tag on this commit when it does not exist yet (the Run workflow route).
+          gh release create "$TAG" Balance.apk Balance.apk.sha256 \
+            --title "Balance $VERSION" \
             --notes-file notes.md \
-            --verify-tag
+            --target "$GITHUB_SHA"
