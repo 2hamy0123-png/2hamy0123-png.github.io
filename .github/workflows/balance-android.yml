@@ -54,8 +54,10 @@ jobs:
         env:
           KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          # The alias defaults to "balance" and the key password to the keystore password,
+          # so only ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD are required.
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || 'balance' }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           if [ -n "$KS_B64" ]; then
             echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
